@@ -1,7 +1,7 @@
 services:
   broker:
     image: docker.io/library/redis:7
-    pull_policy: missing       # Forces local image matching first
+    pull_policy: missing
     restart: unless-stopped
     volumes:
       - ${REDIS_DIR}:/data
@@ -11,7 +11,7 @@ services:
     pull_policy: missing
     restart: unless-stopped
     volumes:
-      - ${DB_DIR}:/var/lib/postgresql/data
+      - paperless_db_data:/var/lib/postgresql/data # <--- Changed to Named Volume
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -59,3 +59,8 @@ services:
     image: docker.io/apache/tika:latest
     pull_policy: missing
     restart: unless-stopped
+
+# <--- Declare the Named Volume at the bottom of the file
+volumes:
+  paperless_db_data:
+
