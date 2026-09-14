@@ -1,0 +1,61 @@
+services:
+  broker:
+    image: docker.io/library/redis:7
+    pull_policy: missing       # Forces local image matching first
+    restart: unless-stopped
+    volumes:
+      - ${REDIS_DIR}:/data
+
+  db:
+    image: docker.io/library/postgres:16
+    pull_policy: missing
+    restart: unless-stopped
+    volumes:
+      - ${DB_DIR}:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    pull_policy: missing
+    restart: unless-stopped
+    depends_on:
+      - broker
+      - db
+      - gotenberg
+      - tika
+    ports:
+      - "${PAPERLESS_PORT}:8000"
+    volumes:
+      - ${DATA_DIR}:/usr/src/paperless/data
+      - ${MEDIA_DIR}:/usr/src/paperless/media
+      - ${EXPORT_DIR}:/usr/src/paperless/export
+      - ${CONSUME_DIR}:/usr/src/paperless/consume
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBUSER: ${DB_USER}
+      PAPERLESS_DBPASS: ${DB_PASSWORD}
+      PAPERLESS_DBNAME: ${DB_NAME}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY}
+      PAPERLESS_URL: ${PAPERLESS_URL}
+      USER_TZ: ${USER_TZ}
+      PAPERLESS_OCR_LANGUAGE: ${PAPERLESS_OCR_LANGUAGE}
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+
+  gotenberg:
+    image: docker.io/gotenberg/gotenberg:8
+    pull_policy: missing
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-start-timeout=20s"
+
+  tika:
+    image: docker.io/apache/tika:latest
+    pull_policy: missing
+    restart: unless-stopped
