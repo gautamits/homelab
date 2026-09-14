@@ -1,0 +1,81 @@
+# ==============================================================================
+# SETUP INSTRUCTIONS:
+# 1. Create your local storage directories:
+#    mkdir -p data media export consume db redis
+# 2. Set file permissions if needed (e.g., chown -R 1000:1000 directories)
+# 3. Create a `.env` file using the template provided and edit the credentials.
+# 4. Deploy the stack: docker compose up -d
+# 5. Create your admin account: docker compose exec webserver createsuperuser
+# ==============================================================================
+
+services:
+  # Task broker for scheduling asynchronous background tasks
+  broker:
+    image: docker.io/library/redis:7
+    restart: unless-stopped
+    volumes:
+      - ${REDIS_DIR}:/data
+
+  # Relational database backend for system metadata
+  db:
+    image: docker.io/library/postgres:16
+    restart: unless-stopped
+    volumes:
+      - ${DB_DIR}:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+  # Core Paperless-ngx application engine
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - broker
+      - db
+      - gotenberg
+      - tika
+    ports:
+      - "${PAPERLESS_PORT}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ${DATA_DIR}:/usr/src/paperless/data
+      - ${MEDIA_DIR}:/usr/src/paperless/media
+      - ${EXPORT_DIR}:/usr/src/paperless/export
+      - ${CONSUME_DIR}:/usr/src/paperless/consume
+    environment:
+      # Infrastructure connections
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBUSER: ${DB_USER}
+      PAPERLESS_DBPASS: ${DB_PASSWORD}
+      PAPERLESS_DBNAME: ${DB_NAME}
+      
+      # Core application settings
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY}
+      PAPERLESS_URL: ${PAPERLESS_URL}
+      USER_TZ: ${USER_TZ}
+      PAPERLESS_OCR_LANGUAGE: ${PAPERLESS_OCR_LANGUAGE}
+      
+      # Integrations for MS Office parsing
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+
+  # Engine to convert Word, Excel, and Powerpoint documents to PDF
+  gotenberg:
+    image: docker.io/gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-start-timeout=20s"
+
+  # Text extraction engine required by Gotenberg for parsing files
+  tika:
+    image: docker.io/apache/tika:latest
+    restart: unless-stopped
