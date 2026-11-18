@@ -1,0 +1,47 @@
+services:
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/stacks:/app/stacks
+      - /opt/dockge/data:/app/data
+    environment:
+      - DOCKGE_STACKS_DIR=/app/stacks
+
+  git-sync:
+    image: registry.k8s.io/git-sync/git-sync:v4.2.0
+    container_name: git-sync
+    restart: unless-stopped
+    volumes:
+      - /opt/stacks:/tmp/git
+    environment:
+      - GIT_SYNC_REPO=https://github.com/YOUR_USERNAME/YOUR_REPO.git
+      - GIT_SYNC_BRANCH=main
+      - GIT_SYNC_ROOT=/tmp/git
+      - GIT_SYNC_DEST=stacks
+      - GIT_SYNC_WAIT=60
+      # Uncomment below if your GitHub repository is private:
+      # - GIT_SYNC_USERNAME=${GITHUB_USER}
+      # - GIT_SYNC_PASSWORD=${GITHUB_TOKEN}
+
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - /media/amit/data/containers/npm/data:/data
+      - /media/amit/data/containers/npm/letsencrypt:/etc/letsencrypt
+    networks:
+      - proxy-tier
+
+networks:
+  proxy-tier:
+    external: true

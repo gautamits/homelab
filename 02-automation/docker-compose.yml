@@ -1,0 +1,25 @@
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    privileged: true
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - /media/amit/data/containers/home-assistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    environment:
+      TZ: ${TZ:-Asia/Kolkata}
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - /media/amit/data/containers/home-assistant/config/mosquitto/config:/mosquitto/config
+      - /media/amit/data/containers/home-assistant/config/mosquitto/data:/mosquitto/data
+      - /media/amit/data/containers/home-assistant/config/mosquitto/log:/mosquitto/log

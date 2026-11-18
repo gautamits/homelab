@@ -1,0 +1,35 @@
+services:
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    container_name: frigate
+    privileged: true
+    restart: unless-stopped
+    shm_size: "128mb"
+    ports:
+      - "5000:5000"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /media/amit/data/containers/frigate/config:/config
+      - /media/amit/backup/shared/cctv:/media/frigate
+    networks:
+      - proxy-tier
+
+  rclone-backup:
+    image: rclone/rclone:latest
+    container_name: rclone_backup
+    restart: unless-stopped
+    volumes:
+      - ${UPLOAD_LOCATION}:/data/photos:ro
+      - /media/amit/backup/containers/immich-cloned:/data/backup-target
+      - /media/amit/data/containers/rclone/config:/config/rclone
+    entrypoint: |
+      sh -c 'while true; do
+        echo "Starting scheduled photo cloning backup loop...";
+        rclone sync /data/photos /data/backup-target --verbose;
+        echo "Sync cycle finalized successfully. Sleeping for 12 hours.";
+        sleep 43200;
+      done'
+
+networks:
+  proxy-tier:
+    external: true

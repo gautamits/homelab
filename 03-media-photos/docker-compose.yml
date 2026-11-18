@@ -1,0 +1,74 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+      - "7359:7359/udp"
+    volumes:
+      - /media/amit/backup/containers/jellyfin/config:/config
+      - /media/amit/backup/containers/jellyfin/cache:/cache
+      - /media/amit/backup/shared:/media
+    environment:
+      - JELLYFIN_PublishedServerUrl=http://thinkcentre.lan:8096
+      - TZ=${TZ:-Asia/Kolkata}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - proxy-tier
+
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    restart: always
+    volumes:
+      - ${UPLOAD_LOCATION}:/data
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    ports:
+      - "2283:2283"
+    depends_on:
+      - redis
+      - database
+    networks:
+      - proxy-tier
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    restart: always
+    volumes:
+      - model-cache:/cache
+    env_file:
+      - .env
+    networks:
+      - proxy-tier
+
+  redis:
+    container_name: immich_redis
+    image: docker.io/valkey/valkey:9
+    restart: always
+    networks:
+      - proxy-tier
+
+  database:
+    container_name: immich_postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    restart: always
+    shm_size: 128mb
+    env_file:
+      - .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - proxy-tier
+
+volumes:
+  model-cache:
+  pgdata:
+
+networks:
+  proxy-tier:
+    external: true
